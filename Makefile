@@ -19,7 +19,7 @@ CFLAGS=$(CFLAGS_INCLUDE) $(CFLAGS_OPT_COMMON) $(CFLAGS_OPT_STRICT)
 LDFLAGS=-lmosquitto -ljson-c -lnetsnmp
 LDFLAGS_DISCOVER=-lnetsnmp
 SOURCES=include/mqtt_linux.h include/util_linux.h include/config_linux.h include/snmp_linux.h
-TARGET = traffmon
+TARGET = trafmon
 DISCOVER = discover
 HOSTNAME = $(shell hostname)
 

@@ -30,13 +30,13 @@
 // -----------------------------------------------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------------------------------------------------
 
-#define CONFIG_FILE_DEFAULT "traffmon.default"
+#define CONFIG_FILE_DEFAULT "trafmon.default"
 
 #define HEARTBEAT_PERIOD_DEFAULT 60
 #define TRAFFIC_POLL_PERIOD_DEFAULT 60
 
 #define MQTT_SERVER_DEFAULT ""
-#define MQTT_CLIENT_DEFAULT "traffmon"
+#define MQTT_CLIENT_DEFAULT "trafmon"
 #define MQTT_TOPIC_PREFIX_DEFAULT "system/traffic"
 
 #define MAX_TRAFFIC_TARGETS 64

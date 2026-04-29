@@ -1,5 +1,5 @@
 ```
-root@router:~# cat /etc/default/traffmon
+root@router:~# cat /etc/default/trafmon
 name=router
 
 heartbeat-period=60
@@ -15,10 +15,10 @@ traffic-iface[uplink][1]=router-a.lan:public:2:wan
 traffic-iface[uplink][2]=router-b.lan:public:2:wan
 
 mqtt-server=mqtt://localhost
-mqtt-client=traffmon
+mqtt-client=trafmon
 mqtt-topic-prefix=system/traffic
 
-root@router:~# systemctl restart traffmon && mosquitto_sub -t system/traffic/#
+root@router:~# systemctl restart trafmon && mosquitto_sub -t system/traffic/#
 { "timestamp": 1761738933, "hostname": "router", "name": "router", "event": "startup", "success": true, "message": "daemon started" }
 { "timestamp": 1761738995, "hostname": "router", "name": "switch", "event": "traffic", "success": true, "message": "2/2 interfaces ok",
   "interfaces": [
@@ -45,5 +45,5 @@ Daemon-level events (`startup`, `shutdown`, `heartbeat`) publish to `<mqtt-topic
 The `discover` helper walks SNMP `ifDescr` on one or more devices and prints `traffic-iface[<host>][<n>]=...` entries you can paste into the config. The bundle name defaults to the host argument — rename it however you like:
 
 ```
-root@router:~# ./discover 192.168.0.128 192.168.0.107:private >> /etc/default/traffmon
+root@router:~# ./discover 192.168.0.128 192.168.0.107:private >> /etc/default/trafmon
 ```

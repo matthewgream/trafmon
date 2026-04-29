@@ -76,8 +76,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "without --bundle, each host becomes its own bundle named after the host.\n");
         fprintf(stderr, "with --bundle=NAME, all discovered interfaces aggregate into one bundle.\n");
         fprintf(stderr, "\n");
-        fprintf(stderr, "output is traffmon.cfg format. Redirect to save:\n");
-        fprintf(stderr, "  %s 192.168.0.128 192.168.0.107 >> /etc/default/traffmon\n", argv[0]);
+        fprintf(stderr, "output is trafmon.cfg format. Redirect to save:\n");
+        fprintf(stderr, "  %s 192.168.0.128 192.168.0.107 >> /etc/default/trafmon\n", argv[0]);
         return EXIT_FAILURE;
     }
 
