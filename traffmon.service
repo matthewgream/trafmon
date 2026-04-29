@@ -1,0 +1,15 @@
+[Unit]
+Description=traffmon — traffic monitor
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/traffmon --config /etc/default/traffmon
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

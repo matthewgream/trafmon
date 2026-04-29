@@ -1,0 +1,13 @@
+
+name=router
+
+heartbeat-period=60
+
+traffic-poll-period=60
+traffic-iface[1]=switch.lan:public:1:uplink
+traffic-iface[2]=switch.lan:public:2:server
+
+mqtt-server=mqtt://localhost
+mqtt-client=traffmon
+mqtt-topic-prefix=system/traffic
+
