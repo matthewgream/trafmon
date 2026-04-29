@@ -49,9 +49,7 @@ static bool walk_callback(const char *oid_str, const snmp_value_t *value, void *
     return true;
 }
 
-static bool is_not_connected(const char *name) {
-    return strncmp(name, "n/c", 3) == 0 || strstr(name, "no connect") != NULL;
-}
+static bool is_not_connected(const char *name) { return strncmp(name, "n/c", 3) == 0 || strstr(name, "no connect") != NULL; }
 
 // -----------------------------------------------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------------------------------------------------
@@ -105,10 +103,12 @@ int main(int argc, char **argv) {
         qsort(state.ifaces, (size_t)state.count, sizeof(discovered_iface_t), compare_iface);
         fprintf(stderr, "  found %d interfaces\n", state.count);
 
-        printf("\n# %s (%s) - %d interfaces\n", host, community, state.count);
+        printf("\n# %s (%s) - %d interfaces (rename bundle '%s' as desired)\n", host, community, state.count, host);
+        int bundle_idx = 0;
         for (int j = 0; j < state.count; j++) {
             const char *prefix = is_not_connected(state.ifaces[j].name) ? "# " : "";
-            printf("%straffic-iface[%d]=%s:%s:%d:%s\n", prefix, ++total_count, host, community, state.ifaces[j].index, state.ifaces[j].name);
+            printf("%straffic-iface[%s][%d]=%s:%s:%d:%s\n", prefix, host, ++bundle_idx, host, community, state.ifaces[j].index, state.ifaces[j].name);
+            total_count++;
         }
     }
 

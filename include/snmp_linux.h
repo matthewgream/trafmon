@@ -141,8 +141,8 @@ bool snmp_get(const char *host, const char *community, snmp_get_item_t *items, i
         return false;
     }
 
-    int idx                       = 0;
-    struct variable_list *vars    = response->variables;
+    int idx                    = 0;
+    struct variable_list *vars = response->variables;
     while (vars && idx < count) {
         if (vars->type != SNMP_NOSUCHOBJECT && vars->type != SNMP_NOSUCHINSTANCE && vars->type != SNMP_ENDOFMIBVIEW)
             __snmp_extract(vars, &items[idx].value);
