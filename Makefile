@@ -31,12 +31,34 @@ $(DISCOVER): $(DISCOVER).c include/snmp_linux.h
 	$(CC) $(CFLAGS) -o $(DISCOVER) $(DISCOVER).c $(LDFLAGS_DISCOVER)
 all: $(TARGET) $(DISCOVER)
 clean:
-	rm -f $(TARGET) $(DISCOVER)
+	rm -f $(TARGET) $(DISCOVER) $(TARGET).armhf $(DISCOVER).armhf
 format:
 	clang-format -i $(TARGET).c $(DISCOVER).c include/*.h
 test: $(TARGET)
 	./$(TARGET) --config $(TARGET).$(HOSTNAME).default
-.PHONY: all clean format test lint
+DEV_PACKAGES=libmosquitto-dev libjson-c-dev libsnmp-dev
+DEV_PACKAGES_ARMHF=$(addsuffix :armhf,$(DEV_PACKAGES))
+install-dev:
+	apt install -y $(DEV_PACKAGES)
+remove-dev:
+	apt purge -y $(DEV_PACKAGES)
+install-dev-armhf:
+	dpkg --add-architecture armhf
+	apt update
+	apt install -y gcc-arm-linux-gnueabihf $(DEV_PACKAGES_ARMHF)
+remove-dev-armhf:
+	apt purge -y gcc-arm-linux-gnueabihf $(DEV_PACKAGES_ARMHF)
+	dpkg --remove-architecture armhf
+	apt update
+
+CROSS_CC_ARMHF=arm-linux-gnueabihf-gcc
+$(TARGET).armhf: $(TARGET).c $(SOURCES)
+	$(CROSS_CC_ARMHF) $(CFLAGS) -o $(TARGET).armhf $(TARGET).c $(LDFLAGS)
+$(DISCOVER).armhf: $(DISCOVER).c include/snmp_linux.h
+	$(CROSS_CC_ARMHF) $(CFLAGS) -o $(DISCOVER).armhf $(DISCOVER).c $(LDFLAGS_DISCOVER)
+armhf: $(TARGET).armhf $(DISCOVER).armhf
+
+.PHONY: all clean format test lint install-dev remove-dev install-dev-armhf remove-dev-armhf armhf
 
 ##
 
