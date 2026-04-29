@@ -22,6 +22,7 @@ SOURCES=include/mqtt_linux.h include/util_linux.h include/config_linux.h include
 TARGET = trafmon
 DISCOVER = discover
 HOSTNAME = $(shell hostname)
+CFG_SRC := $(if $(wildcard $(TARGET).$(HOSTNAME).cfg),$(TARGET).$(HOSTNAME).cfg,$(TARGET).cfg)
 
 ##
 
@@ -35,7 +36,7 @@ clean:
 format:
 	clang-format -i $(TARGET).c $(DISCOVER).c include/*.h
 test: $(TARGET)
-	./$(TARGET) --config $(TARGET).$(HOSTNAME).default
+	./$(TARGET) --config $(CFG_SRC)
 DEV_PACKAGES=libmosquitto-dev libjson-c-dev libsnmp-dev
 DEV_PACKAGES_ARMHF=$(addsuffix :armhf,$(DEV_PACKAGES))
 install-dev:
@@ -77,8 +78,9 @@ define install_systemd_service
 endef
 install_systemd_service: $(TARGET).service
 	$(call install_systemd_service,$(TARGET),$(TARGET))
-install_default: $(TARGET).$(HOSTNAME).default
-	cp $(TARGET).$(HOSTNAME).default $(DEFAULT_DIR)/$(TARGET)
+install_default: $(CFG_SRC)
+	@echo "installing config from $(CFG_SRC)"
+	cp $(CFG_SRC) $(DEFAULT_DIR)/$(TARGET)
 install_target: $(TARGET)
 	$(call stop_systemd_service,$(TARGET))
 	cp $(TARGET) $(TARGET_DIR)/$(TARGET)
