@@ -1,5 +1,5 @@
 [Unit]
-Description=trafmon — traffic monitor
+Description=trafmon - traffic monitor
 After=network-online.target mosquitto.service
 Wants=network-online.target
 
