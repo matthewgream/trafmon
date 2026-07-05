@@ -43,7 +43,9 @@ bool snmp_begin(void) {
     return true;
 }
 
-void snmp_end(void) { snmp_shutdown("traffmon"); }
+void snmp_end(void) {
+    snmp_shutdown("traffmon");
+}
 
 // -----------------------------------------------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------------------------------------------------
@@ -53,24 +55,24 @@ void snmp_end(void) { snmp_shutdown("traffmon"); }
 static struct snmp_session *__snmp_session_open(const char *host, const char *community, long timeout_us) {
     struct snmp_session session;
     snmp_sess_init(&session);
-    session.peername      = (char *)host;
-    session.community     = (u_char *)community;
+    session.peername = (char *)host;
+    session.community = (u_char *)community;
     session.community_len = strlen(community);
-    session.version       = SNMP_VERSION_2c;
-    session.timeout       = timeout_us;
-    session.retries       = SNMP_RETRIES;
+    session.version = SNMP_VERSION_2c;
+    session.timeout = timeout_us;
+    session.retries = SNMP_RETRIES;
     return snmp_open(&session);
 }
 #pragma GCC diagnostic pop
 
 static void __snmp_extract(const struct variable_list *vars, snmp_value_t *value) {
-    value->valid  = true;
-    value->u64    = 0;
+    value->valid = true;
+    value->u64 = 0;
     value->str[0] = '\0';
     switch (vars->type) {
     case ASN_COUNTER64: {
         const struct counter64 *c = vars->val.counter64;
-        value->u64                = ((uint64_t)c->high << 32) | (uint64_t)c->low;
+        value->u64 = ((uint64_t)c->high << 32) | (uint64_t)c->low;
         break;
     }
     case ASN_COUNTER:
@@ -100,8 +102,8 @@ static void __snmp_extract(const struct variable_list *vars, snmp_value_t *value
 bool snmp_get(const char *host, const char *community, snmp_get_item_t *items, int count, char *error_message, size_t error_size) {
 
     for (int i = 0; i < count; i++) {
-        items[i].value.valid  = false;
-        items[i].value.u64    = 0;
+        items[i].value.valid = false;
+        items[i].value.u64 = 0;
         items[i].value.str[0] = '\0';
     }
 
@@ -126,7 +128,7 @@ bool snmp_get(const char *host, const char *community, snmp_get_item_t *items, i
     }
 
     struct snmp_pdu *response = NULL;
-    int status                = snmp_synch_response(ss, pdu, &response);
+    int status = snmp_synch_response(ss, pdu, &response);
     if (status != STAT_SUCCESS) {
         snprintf(error_message, error_size, "%s", snmp_api_errstring(ss->s_snmp_errno));
         if (response)
@@ -141,7 +143,7 @@ bool snmp_get(const char *host, const char *community, snmp_get_item_t *items, i
         return false;
     }
 
-    int idx                    = 0;
+    int idx = 0;
     struct variable_list *vars = response->variables;
     while (vars && idx < count) {
         if (vars->type != SNMP_NOSUCHOBJECT && vars->type != SNMP_NOSUCHINSTANCE && vars->type != SNMP_ENDOFMIBVIEW)
@@ -189,7 +191,7 @@ bool snmp_walk(const char *host, const char *community, const char *base_oid_str
         snmp_add_null_var(pdu, next_oid, next_oid_len);
 
         struct snmp_pdu *response = NULL;
-        int status                = snmp_synch_response(ss, pdu, &response);
+        int status = snmp_synch_response(ss, pdu, &response);
         if (status != STAT_SUCCESS) {
             snprintf(error_message, error_size, "%s", snmp_api_errstring(ss->s_snmp_errno));
             if (response)

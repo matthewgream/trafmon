@@ -18,8 +18,8 @@
 #include "include/util_linux.h"
 
 #define MQTT_CONNECT_TIMEOUT 60
-#define MQTT_PUBLISH_QOS 0
-#define MQTT_PUBLISH_RETAIN false
+#define MQTT_PUBLISH_QOS     0
+#define MQTT_PUBLISH_RETAIN  false
 #include "include/mqtt_linux.h"
 
 #define CONFIG_MAX_ENTRIES 256
@@ -30,24 +30,24 @@
 // -----------------------------------------------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------------------------------------------------
 
-#define CONFIG_FILE_DEFAULT "trafmon.cfg"
+#define CONFIG_FILE_DEFAULT         "trafmon.cfg"
 
-#define HEARTBEAT_PERIOD_DEFAULT 60
+#define HEARTBEAT_PERIOD_DEFAULT    60
 #define TRAFFIC_POLL_PERIOD_DEFAULT 60
 
-#define MQTT_SERVER_DEFAULT ""
-#define MQTT_CLIENT_DEFAULT "trafmon"
-#define MQTT_TOPIC_PREFIX_DEFAULT "system/traffic"
+#define MQTT_SERVER_DEFAULT         ""
+#define MQTT_CLIENT_DEFAULT         "trafmon"
+#define MQTT_TOPIC_PREFIX_DEFAULT   "system/traffic"
 
-#define MAX_TRAFFIC_TARGETS 64
-#define MAX_TRAFFIC_BUNDLES 32
-#define MAX_BUNDLE_NAME 64
+#define MAX_TRAFFIC_TARGETS         64
+#define MAX_TRAFFIC_BUNDLES         32
+#define MAX_BUNDLE_NAME             64
 
 // -----------------------------------------------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------------------------------------------------
 
-#define PRINTF_ERROR printf_stderr
-#define PRINTF_INFO printf_stdout
+#define PRINTF_ERROR                printf_stderr
+#define PRINTF_INFO                 printf_stdout
 
 void printf_stdout(const char *format, ...) {
     va_list args;
@@ -191,8 +191,8 @@ static const char *traffic_oid_bases[TRAFFIC_OID_COUNT] = {
 
 static void traffic_format_bytes(uint64_t bytes, char *out, size_t out_size) {
     static const char *units[] = { "B", "KB", "MB", "GB", "TB", "PB" };
-    double v                   = (double)bytes;
-    size_t u                   = 0;
+    double v = (double)bytes;
+    size_t u = 0;
     while (v >= 1024.0 && u < (sizeof(units) / sizeof(units[0])) - 1) {
         v /= 1024.0;
         u++;
@@ -200,12 +200,13 @@ static void traffic_format_bytes(uint64_t bytes, char *out, size_t out_size) {
     snprintf(out, out_size, "%.1f%s", v, units[u]);
 }
 
-static uint64_t traffic_delta_u64(uint64_t curr, uint64_t prev) { return (curr >= prev) ? curr - prev : 0; }
+static uint64_t traffic_delta_u64(uint64_t curr, uint64_t prev) {
+    return (curr >= prev) ? curr - prev : 0;
+}
 
-static void traffic_collect_host(const char *bundle_name, const char *host, const char *community, const int *target_indices, int target_count, time_t now, json_object *interfaces,
-                                 int *success_count, int *fail_count) {
+static void traffic_collect_host(const char *bundle_name, const char *host, const char *community, const int *target_indices, int target_count, time_t now, json_object *interfaces, int *success_count, int *fail_count) {
 
-    const int item_count   = target_count * TRAFFIC_OID_COUNT;
+    const int item_count = target_count * TRAFFIC_OID_COUNT;
     snmp_get_item_t *items = calloc((size_t)item_count, sizeof(snmp_get_item_t));
     if (!items)
         return;
@@ -234,24 +235,24 @@ static void traffic_collect_host(const char *bundle_name, const char *host, cons
             continue;
         }
 
-        uint64_t in_octets   = r[0].value.u64;
-        uint64_t out_octets  = r[1].value.u64;
-        uint64_t in_packets  = r[2].value.u64;
+        uint64_t in_octets = r[0].value.u64;
+        uint64_t out_octets = r[1].value.u64;
+        uint64_t in_packets = r[2].value.u64;
         uint64_t out_packets = r[3].value.u64;
-        uint64_t in_errors   = r[4].value.u64;
-        uint64_t out_errors  = r[5].value.u64;
+        uint64_t in_errors = r[4].value.u64;
+        uint64_t out_errors = r[5].value.u64;
         uint64_t oper_status = r[6].value.u64;
-        uint64_t speed_mbps  = r[7].value.u64;
+        uint64_t speed_mbps = r[7].value.u64;
 
         if (!target->has_prev) {
-            target->prev_time        = now;
-            target->prev_in_octets   = in_octets;
-            target->prev_out_octets  = out_octets;
-            target->prev_in_packets  = in_packets;
+            target->prev_time = now;
+            target->prev_in_octets = in_octets;
+            target->prev_out_octets = out_octets;
+            target->prev_in_packets = in_packets;
             target->prev_out_packets = out_packets;
-            target->prev_in_errors   = in_errors;
-            target->prev_out_errors  = out_errors;
-            target->has_prev         = true;
+            target->prev_in_errors = in_errors;
+            target->prev_out_errors = out_errors;
+            target->has_prev = true;
             continue;
         }
 
@@ -259,14 +260,14 @@ static void traffic_collect_host(const char *bundle_name, const char *host, cons
         if (duration <= 0)
             continue;
 
-        uint64_t in_bytes  = traffic_delta_u64(in_octets, target->prev_in_octets);
+        uint64_t in_bytes = traffic_delta_u64(in_octets, target->prev_in_octets);
         uint64_t out_bytes = traffic_delta_u64(out_octets, target->prev_out_octets);
-        uint64_t in_pkts   = traffic_delta_u64(in_packets, target->prev_in_packets);
-        uint64_t out_pkts  = traffic_delta_u64(out_packets, target->prev_out_packets);
-        uint64_t in_errs   = traffic_delta_u64(in_errors, target->prev_in_errors);
-        uint64_t out_errs  = traffic_delta_u64(out_errors, target->prev_out_errors);
+        uint64_t in_pkts = traffic_delta_u64(in_packets, target->prev_in_packets);
+        uint64_t out_pkts = traffic_delta_u64(out_packets, target->prev_out_packets);
+        uint64_t in_errs = traffic_delta_u64(in_errors, target->prev_in_errors);
+        uint64_t out_errs = traffic_delta_u64(out_errors, target->prev_out_errors);
 
-        uint64_t in_bps  = (in_bytes * 8) / (uint64_t)duration;
+        uint64_t in_bps = (in_bytes * 8) / (uint64_t)duration;
         uint64_t out_bps = (out_bytes * 8) / (uint64_t)duration;
 
         if (traffic_config.verbose) {
@@ -275,8 +276,7 @@ static void traffic_collect_host(const char *bundle_name, const char *host, cons
             traffic_format_bytes(out_bytes, out_str, sizeof(out_str));
             if (in_errs > 0 || out_errs > 0)
                 snprintf(errors_str, sizeof(errors_str), " ERRORS:%lu/%lu", (unsigned long)in_errs, (unsigned long)out_errs);
-            printf("traffic[%s]: %s/%s %lds rx:%s(%.2fMbps) tx:%s(%.2fMbps)%s\n", bundle_name, target->host, target->name, (long)duration, in_str, (double)in_bps / 1e6, out_str,
-                   (double)out_bps / 1e6, errors_str);
+            printf("traffic[%s]: %s/%s %lds rx:%s(%.2fMbps) tx:%s(%.2fMbps)%s\n", bundle_name, target->host, target->name, (long)duration, in_str, (double)in_bps / 1e6, out_str, (double)out_bps / 1e6, errors_str);
         }
 
         json_object *iface = json_object_new_object();
@@ -296,13 +296,13 @@ static void traffic_collect_host(const char *bundle_name, const char *host, cons
         json_object_array_add(interfaces, iface);
         (*success_count)++;
 
-        target->prev_time        = now;
-        target->prev_in_octets   = in_octets;
-        target->prev_out_octets  = out_octets;
-        target->prev_in_packets  = in_packets;
+        target->prev_time = now;
+        target->prev_in_octets = in_octets;
+        target->prev_out_octets = out_octets;
+        target->prev_in_packets = in_packets;
         target->prev_out_packets = out_packets;
-        target->prev_in_errors   = in_errors;
-        target->prev_out_errors  = out_errors;
+        target->prev_in_errors = in_errors;
+        target->prev_out_errors = out_errors;
     }
 
     free(items);
@@ -310,26 +310,25 @@ static void traffic_collect_host(const char *bundle_name, const char *host, cons
 
 static void traffic_poll_bundle(traffic_bundle_t *bundle) {
 
-    time_t now              = time(NULL);
+    time_t now = time(NULL);
     json_object *interfaces = json_object_new_array();
-    int success_count       = 0;
-    int fail_count          = 0;
+    int success_count = 0;
+    int fail_count = 0;
 
     bool processed[MAX_TRAFFIC_TARGETS] = { false };
     for (int i = 0; i < bundle->target_count; i++) {
         if (processed[i])
             continue;
         int batch[MAX_TRAFFIC_TARGETS];
-        int batch_count      = 0;
+        int batch_count = 0;
         batch[batch_count++] = bundle->target_indices[i];
-        processed[i]         = true;
+        processed[i] = true;
         traffic_target_t *t0 = &traffic_config.targets[bundle->target_indices[i]];
         for (int j = i + 1; j < bundle->target_count; j++)
             if (!processed[j])
-                if (strcmp(t0->host, traffic_config.targets[bundle->target_indices[j]].host) == 0 &&
-                    strcmp(t0->community, traffic_config.targets[bundle->target_indices[j]].community) == 0) {
+                if (strcmp(t0->host, traffic_config.targets[bundle->target_indices[j]].host) == 0 && strcmp(t0->community, traffic_config.targets[bundle->target_indices[j]].community) == 0) {
                     batch[batch_count++] = bundle->target_indices[j];
-                    processed[j]         = true;
+                    processed[j] = true;
                 }
         traffic_collect_host(bundle->name, t0->host, t0->community, batch, batch_count, now, interfaces, &success_count, &fail_count);
     }
@@ -402,30 +401,30 @@ static bool config_parse_traffic_iface(const char *value, traffic_target_t *targ
     char buf[512];
     strncpy(buf, value, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
-    char *p              = buf;
-    char *host_str       = strsep(&p, ":");
-    char *community_str  = strsep(&p, ":");
-    char *index_str      = strsep(&p, ":");
-    char *name_str       = p;
+    char *p = buf;
+    char *host_str = strsep(&p, ":");
+    char *community_str = strsep(&p, ":");
+    char *index_str = strsep(&p, ":");
+    char *name_str = p;
     if (!host_str || !community_str || !index_str || !name_str || !*host_str || !*community_str || !*index_str || !*name_str)
         return false;
     strncpy(target->host, host_str, sizeof(target->host) - 1);
     target->host[sizeof(target->host) - 1] = '\0';
     strncpy(target->community, community_str, sizeof(target->community) - 1);
     target->community[sizeof(target->community) - 1] = '\0';
-    target->index                                    = atoi(index_str);
+    target->index = atoi(index_str);
     strncpy(target->name, name_str, sizeof(target->name) - 1);
     target->name[sizeof(target->name) - 1] = '\0';
-    target->has_prev                       = false;
+    target->has_prev = false;
     return target->index > 0;
 }
 
 static bool config_parse_iface_key(const char *key, char *bundle, size_t bundle_size, int *index) {
     static const char prefix[] = "traffic-iface[";
-    size_t prefix_len          = sizeof(prefix) - 1;
+    size_t prefix_len = sizeof(prefix) - 1;
     if (strncmp(key, prefix, prefix_len) != 0)
         return false;
-    const char *p      = key + prefix_len;
+    const char *p = key + prefix_len;
     const char *close1 = strchr(p, ']');
     if (!close1)
         return false;
@@ -436,7 +435,7 @@ static bool config_parse_iface_key(const char *key, char *bundle, size_t bundle_
     bundle[name_len] = '\0';
     if (close1[1] != '[')
         return false;
-    p                  = close1 + 2;
+    p = close1 + 2;
     const char *close2 = strchr(p, ']');
     if (!close2 || close2[1] != '\0')
         return false;
@@ -446,7 +445,7 @@ static bool config_parse_iface_key(const char *key, char *bundle, size_t bundle_
         return false;
     memcpy(num, p, num_len);
     num[num_len] = '\0';
-    *index       = atoi(num);
+    *index = atoi(num);
     return *index > 0;
 }
 
@@ -459,7 +458,7 @@ static traffic_bundle_t *config_get_or_create_bundle(const char *name) {
     traffic_bundle_t *bundle = &traffic_config.bundles[traffic_config.bundle_count++];
     strncpy(bundle->name, name, sizeof(bundle->name) - 1);
     bundle->name[sizeof(bundle->name) - 1] = '\0';
-    bundle->target_count                   = 0;
+    bundle->target_count = 0;
     return bundle;
 }
 
@@ -503,7 +502,7 @@ bool config_load_settings(const int argc, const char *argv[]) {
     if (!config_load(CONFIG_FILE_DEFAULT, argc, argv, config_options))
         return false;
 
-    timing_config.heartbeat_period    = config_get_integer("heartbeat-period", HEARTBEAT_PERIOD_DEFAULT);
+    timing_config.heartbeat_period = config_get_integer("heartbeat-period", HEARTBEAT_PERIOD_DEFAULT);
     timing_config.traffic_poll_period = config_get_integer("traffic-poll-period", TRAFFIC_POLL_PERIOD_DEFAULT);
 
     heartbeat_config.enabled = (timing_config.heartbeat_period > 0);
@@ -531,9 +530,9 @@ bool config_load_settings(const int argc, const char *argv[]) {
 
     mqtt_config.server = config_get_string("mqtt-server", MQTT_SERVER_DEFAULT);
     mqtt_config.client = config_get_string("mqtt-client", MQTT_CLIENT_DEFAULT);
-    mqtt_config.debug  = false;
-    mqtt_topic_prefix  = config_get_string("mqtt-topic-prefix", MQTT_TOPIC_PREFIX_DEFAULT);
-    mqtt_enabled       = mqtt_config.server != NULL && (strlen(mqtt_config.server) > 0);
+    mqtt_config.debug = false;
+    mqtt_topic_prefix = config_get_string("mqtt-topic-prefix", MQTT_TOPIC_PREFIX_DEFAULT);
+    mqtt_enabled = mqtt_config.server != NULL && (strlen(mqtt_config.server) > 0);
 
     return true;
 }

@@ -13,7 +13,7 @@
 // -----------------------------------------------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------------------------------------------------
 
-#define OID_IF_DESCR "1.3.6.1.2.1.2.2.1.2"
+#define OID_IF_DESCR   "1.3.6.1.2.1.2.2.1.2"
 #define MAX_INTERFACES 256
 
 typedef struct {
@@ -49,7 +49,9 @@ static bool walk_callback(const char *oid_str, const snmp_value_t *value, void *
     return true;
 }
 
-static bool is_not_connected(const char *name) { return strncmp(name, "n/c", 3) == 0 || strstr(name, "no connect") != NULL; }
+static bool is_not_connected(const char *name) {
+    return strncmp(name, "n/c", 3) == 0 || strstr(name, "no connect") != NULL;
+}
 
 // -----------------------------------------------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------------------------------------------------------------------------------
@@ -57,7 +59,7 @@ static bool is_not_connected(const char *name) { return strncmp(name, "n/c", 3) 
 int main(int argc, char **argv) {
 
     const char *forced_bundle = NULL;
-    int arg_start             = 1;
+    int arg_start = 1;
     while (arg_start < argc && strncmp(argv[arg_start], "--bundle=", 9) == 0) {
         forced_bundle = argv[arg_start] + 9;
         if (!*forced_bundle) {
@@ -92,18 +94,18 @@ int main(int argc, char **argv) {
     printf("traffic-poll-period=60\n");
 
     int total_count = 0;
-    int bundle_idx  = 0;
+    int bundle_idx = 0;
     for (int i = arg_start; i < argc; i++) {
 
         char target[256];
         strncpy(target, argv[i], sizeof(target) - 1);
         target[sizeof(target) - 1] = '\0';
 
-        const char *host      = target;
+        const char *host = target;
         const char *community = "public";
-        char *colon           = strchr(target, ':');
+        char *colon = strchr(target, ':');
         if (colon) {
-            *colon    = '\0';
+            *colon = '\0';
             community = colon + 1;
         }
 
