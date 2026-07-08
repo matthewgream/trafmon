@@ -15,6 +15,8 @@ structure and config convention:
 
 Each poll it walks the configured SNMP interfaces, computes deltas (octets in/out,
 bits/sec, errors, oper status, speed) over the poll window, and reports them.
+Alongside each window it carries a **running total** per interface, accumulated
+since the daemon started (see [Totals](#totals)).
 Interfaces are grouped into named **bundles**; all interfaces in a bundle are
 published together in one message. A bundle can span multiple physical devices —
 handy for aggregating, e.g., redundant uplinks on different routers into one
@@ -90,11 +92,41 @@ $ mosquitto_sub -t 'system/traffic/#'
 { "timestamp":1761738995, "hostname":"bastu", "name":"sauna", "event":"traffic", "success":true,
   "message":"2/2 interfaces ok",
   "interfaces":[
-    { "device":"192.168.0.224", "interface":"uplink", "duration":60, "in_octets":…, "out_octets":…, "in_bps":…, "out_bps":…, "oper_status":1, "speed_mbps":100 },
+    { "device":"192.168.0.224", "interface":"uplink", "duration":60, "in_octets":…, "out_octets":…, "in_bps":…, "out_bps":…, "oper_status":1, "speed_mbps":100,
+      "total_duration":86400, "total_in_octets":…, "total_out_octets":…, "total_in_packets":…, "total_out_packets":…, "total_in_errors":0, "total_out_errors":0, "resets":0 },
     { "device":"192.168.0.225", "interface":"server", "duration":60, … } ] }
 { "timestamp":1761738999, "hostname":"bastu", "name":"bastu", "event":"heartbeat", "success":true,
   "message":"daemon active (1)", "traffic_enabled":true, "traffic_bundles":1, "traffic_targets":7 }
 ```
+
+Each interface reports the **poll window** (`duration`, `in_octets`, `in_bps`, …) and a
+**running total** (`total_duration`, `total_in_octets`, …, `resets`) — see below.
+
+## Totals
+
+Every `total_*` field accumulates the poll-window deltas since the daemon's first
+successful sample of that interface, so they measure *since trafmon started*, not
+since the device booted. They are held in memory only: restarting trafmon restarts
+the totals from zero. `total_duration` is the seconds covered.
+
+SNMP counters only ever climb, so a sample below its predecessor means the counter
+restarted at zero — the interface was reset, or the agent/device rebooted. trafmon
+detects this and counts the current value as the traffic accrued since the restart,
+rather than discarding the window, so the totals stay whole across a reset. Each
+occurrence bumps that interface's `resets`.
+
+Wraparound is not a concern: octets and packets come from the 64-bit `ifHC*`
+counters, and 2^64 octets is millennia at gigabit — a backwards step is therefore
+always a restart, never an overflow.
+
+The log line carries the same information:
+
+```
+traffic[bastu]: 192.168.0.224/uplink 61s rx:13.8KB(0.00Mbps) tx:50.7KB(0.01Mbps) total 1d2h rx:1.2GB tx:3.4GB
+```
+
+with ` ERRORS:<in>/<out>` appended when the window saw errors, and ` RESETS:<n>`
+once a counter reset has been seen on that interface.
 
 ## Companion tool: `discover`
 

@@ -100,6 +100,16 @@ typedef struct {
     uint64_t prev_out_packets;
     uint64_t prev_in_errors;
     uint64_t prev_out_errors;
+    // accumulated across every poll window since the first successful sample (i.e. since
+    // this daemon started), carried over device/interface counter resets
+    time_t total_time;
+    uint64_t total_in_octets;
+    uint64_t total_out_octets;
+    uint64_t total_in_packets;
+    uint64_t total_out_packets;
+    uint64_t total_in_errors;
+    uint64_t total_out_errors;
+    unsigned long resets;
 } traffic_target_t;
 
 typedef struct {
@@ -200,8 +210,30 @@ static void traffic_format_bytes(uint64_t bytes, char *out, size_t out_size) {
     snprintf(out, out_size, "%.1f%s", v, units[u]);
 }
 
-static uint64_t traffic_delta_u64(uint64_t curr, uint64_t prev) {
-    return (curr >= prev) ? curr - prev : 0;
+static void traffic_format_duration(time_t seconds, char *out, size_t out_size) {
+    const long s = (long)(seconds > 0 ? seconds : 0);
+    const long d = s / 86400, h = (s % 86400) / 3600, m = (s % 3600) / 60;
+    if (d > 0)
+        snprintf(out, out_size, "%ldd%ldh", d, h);
+    else if (h > 0)
+        snprintf(out, out_size, "%ldh%ldm", h, m);
+    else
+        snprintf(out, out_size, "%ldm", m);
+}
+
+// SNMP counters only ever climb, so a sample below its predecessor means the counter
+// restarted at zero -- the interface was reset, or the agent/device rebooted. The 64-bit
+// ifHC* counters cannot realistically wrap (2^64 octets is millennia at gigabit), so a
+// backwards step is always a restart and never an overflow, which means the current value
+// *is* the traffic accrued since that restart. Reporting it (rather than discarding the
+// window) keeps the running totals whole across a reset. Pass reset=NULL for counters whose
+// validity we do not check, so a flap to zero cannot be mistaken for a device reset.
+static uint64_t traffic_delta_u64(uint64_t curr, uint64_t prev, bool *reset) {
+    if (curr >= prev)
+        return curr - prev;
+    if (reset)
+        *reset = true;
+    return curr;
 }
 
 static void traffic_collect_host(const char *bundle_name, const char *host, const char *community, const int *target_indices, int target_count, time_t now, json_object *interfaces, int *success_count, int *fail_count) {
@@ -245,6 +277,7 @@ static void traffic_collect_host(const char *bundle_name, const char *host, cons
         uint64_t speed_mbps = r[7].value.u64;
 
         if (!target->has_prev) {
+            target->total_time = now;
             target->prev_time = now;
             target->prev_in_octets = in_octets;
             target->prev_out_octets = out_octets;
@@ -260,23 +293,39 @@ static void traffic_collect_host(const char *bundle_name, const char *host, cons
         if (duration <= 0)
             continue;
 
-        uint64_t in_bytes = traffic_delta_u64(in_octets, target->prev_in_octets);
-        uint64_t out_bytes = traffic_delta_u64(out_octets, target->prev_out_octets);
-        uint64_t in_pkts = traffic_delta_u64(in_packets, target->prev_in_packets);
-        uint64_t out_pkts = traffic_delta_u64(out_packets, target->prev_out_packets);
-        uint64_t in_errs = traffic_delta_u64(in_errors, target->prev_in_errors);
-        uint64_t out_errs = traffic_delta_u64(out_errors, target->prev_out_errors);
+        bool reset = false;
+        uint64_t in_bytes = traffic_delta_u64(in_octets, target->prev_in_octets, &reset);
+        uint64_t out_bytes = traffic_delta_u64(out_octets, target->prev_out_octets, &reset);
+        uint64_t in_pkts = traffic_delta_u64(in_packets, target->prev_in_packets, NULL);
+        uint64_t out_pkts = traffic_delta_u64(out_packets, target->prev_out_packets, NULL);
+        uint64_t in_errs = traffic_delta_u64(in_errors, target->prev_in_errors, NULL);
+        uint64_t out_errs = traffic_delta_u64(out_errors, target->prev_out_errors, NULL);
 
         uint64_t in_bps = (in_bytes * 8) / (uint64_t)duration;
         uint64_t out_bps = (out_bytes * 8) / (uint64_t)duration;
 
+        if (reset)
+            target->resets++;
+        target->total_in_octets += in_bytes;
+        target->total_out_octets += out_bytes;
+        target->total_in_packets += in_pkts;
+        target->total_out_packets += out_pkts;
+        target->total_in_errors += in_errs;
+        target->total_out_errors += out_errs;
+        time_t total_duration = now - target->total_time;
+
         if (traffic_config.verbose) {
-            char in_str[16], out_str[16], errors_str[64] = "";
+            char in_str[16], out_str[16], total_in_str[16], total_out_str[16], total_duration_str[32], errors_str[64] = "", resets_str[32] = "";
             traffic_format_bytes(in_bytes, in_str, sizeof(in_str));
             traffic_format_bytes(out_bytes, out_str, sizeof(out_str));
+            traffic_format_bytes(target->total_in_octets, total_in_str, sizeof(total_in_str));
+            traffic_format_bytes(target->total_out_octets, total_out_str, sizeof(total_out_str));
+            traffic_format_duration(total_duration, total_duration_str, sizeof(total_duration_str));
             if (in_errs > 0 || out_errs > 0)
                 snprintf(errors_str, sizeof(errors_str), " ERRORS:%lu/%lu", (unsigned long)in_errs, (unsigned long)out_errs);
-            printf("traffic[%s]: %s/%s %lds rx:%s(%.2fMbps) tx:%s(%.2fMbps)%s\n", bundle_name, target->host, target->name, (long)duration, in_str, (double)in_bps / 1e6, out_str, (double)out_bps / 1e6, errors_str);
+            if (target->resets > 0)
+                snprintf(resets_str, sizeof(resets_str), " RESETS:%lu", target->resets);
+            printf("traffic[%s]: %s/%s %lds rx:%s(%.2fMbps) tx:%s(%.2fMbps) total %s rx:%s tx:%s%s%s\n", bundle_name, target->host, target->name, (long)duration, in_str, (double)in_bps / 1e6, out_str, (double)out_bps / 1e6, total_duration_str, total_in_str, total_out_str, errors_str, resets_str);
         }
 
         json_object *iface = json_object_new_object();
@@ -293,6 +342,14 @@ static void traffic_collect_host(const char *bundle_name, const char *host, cons
         json_object_object_add(iface, "out_bps", json_object_new_int64((int64_t)out_bps));
         json_object_object_add(iface, "oper_status", json_object_new_int((int32_t)oper_status));
         json_object_object_add(iface, "speed_mbps", json_object_new_int64((int64_t)speed_mbps));
+        json_object_object_add(iface, "total_duration", json_object_new_int64((int64_t)total_duration));
+        json_object_object_add(iface, "total_in_octets", json_object_new_int64((int64_t)target->total_in_octets));
+        json_object_object_add(iface, "total_out_octets", json_object_new_int64((int64_t)target->total_out_octets));
+        json_object_object_add(iface, "total_in_packets", json_object_new_int64((int64_t)target->total_in_packets));
+        json_object_object_add(iface, "total_out_packets", json_object_new_int64((int64_t)target->total_out_packets));
+        json_object_object_add(iface, "total_in_errors", json_object_new_int64((int64_t)target->total_in_errors));
+        json_object_object_add(iface, "total_out_errors", json_object_new_int64((int64_t)target->total_out_errors));
+        json_object_object_add(iface, "resets", json_object_new_int64((int64_t)target->resets));
         json_object_array_add(interfaces, iface);
         (*success_count)++;
 
@@ -398,6 +455,7 @@ void process_loop(void) {
 // -----------------------------------------------------------------------------------------------------------------------------------------
 
 static bool config_parse_traffic_iface(const char *value, traffic_target_t *target) {
+    memset(target, 0, sizeof(*target));
     char buf[512];
     strncpy(buf, value, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
