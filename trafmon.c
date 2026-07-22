@@ -210,17 +210,6 @@ static void traffic_format_bytes(uint64_t bytes, char *out, size_t out_size) {
     snprintf(out, out_size, "%.1f%s", v, units[u]);
 }
 
-static void traffic_format_duration(time_t seconds, char *out, size_t out_size) {
-    const long s = (long)(seconds > 0 ? seconds : 0);
-    const long d = s / 86400, h = (s % 86400) / 3600, m = (s % 3600) / 60;
-    if (d > 0)
-        snprintf(out, out_size, "%ldd%ldh", d, h);
-    else if (h > 0)
-        snprintf(out, out_size, "%ldh%ldm", h, m);
-    else
-        snprintf(out, out_size, "%ldm", m);
-}
-
 // SNMP counters only ever climb, so a sample below its predecessor means the counter
 // restarted at zero -- the interface was reset, or the agent/device rebooted. The 64-bit
 // ifHC* counters cannot realistically wrap (2^64 octets is millennia at gigabit), so a
@@ -236,7 +225,14 @@ static uint64_t traffic_delta_u64(uint64_t curr, uint64_t prev, bool *reset) {
     return curr;
 }
 
-static void traffic_collect_host(const char *bundle_name, const char *host, const char *community, const int *target_indices, int target_count, time_t now, json_object *interfaces, int *success_count, int *fail_count) {
+typedef struct {
+    char *buf;      // accumulates one compact " | iface rx/tx" fragment per interface for a single-line bundle summary
+    size_t cap;     // capacity of buf (including room for the trailing NUL)
+    size_t len;     // bytes used (excluding NUL)
+    time_t window;  // representative poll window (seconds) for the header
+} traffic_summary_t;
+
+static void traffic_collect_host(const char *bundle_name, const char *host, const char *community, const int *target_indices, int target_count, time_t now, json_object *interfaces, int *success_count, int *fail_count, traffic_summary_t *sum) {
 
     const int item_count = target_count * TRAFFIC_OID_COUNT;
     snmp_get_item_t *items = calloc((size_t)item_count, sizeof(snmp_get_item_t));
@@ -314,18 +310,27 @@ static void traffic_collect_host(const char *bundle_name, const char *host, cons
         target->total_out_errors += out_errs;
         time_t total_duration = now - target->total_time;
 
-        if (traffic_config.verbose) {
-            char in_str[16], out_str[16], total_in_str[16], total_out_str[16], total_duration_str[32], errors_str[64] = "", resets_str[32] = "";
+        // Accumulate one compact "| iface rx/tx" fragment; the whole bundle is emitted as a single line by the caller
+        // instead of one verbose line per interface.
+        if (sum) {
+            char in_str[16], out_str[16], extra[48] = "", rst[24] = "";
             traffic_format_bytes(in_bytes, in_str, sizeof(in_str));
             traffic_format_bytes(out_bytes, out_str, sizeof(out_str));
-            traffic_format_bytes(target->total_in_octets, total_in_str, sizeof(total_in_str));
-            traffic_format_bytes(target->total_out_octets, total_out_str, sizeof(total_out_str));
-            traffic_format_duration(total_duration, total_duration_str, sizeof(total_duration_str));
             if (in_errs > 0 || out_errs > 0)
-                snprintf(errors_str, sizeof(errors_str), " ERRORS:%lu/%lu", (unsigned long)in_errs, (unsigned long)out_errs);
+                snprintf(extra, sizeof(extra), " E%lu/%lu", (unsigned long)in_errs, (unsigned long)out_errs);
             if (target->resets > 0)
-                snprintf(resets_str, sizeof(resets_str), " RESETS:%lu", target->resets);
-            printf("traffic[%s]: %s/%s %lds rx:%s(%.2fMbps) tx:%s(%.2fMbps) total %s rx:%s tx:%s%s%s\n", bundle_name, target->host, target->name, (long)duration, in_str, (double)in_bps / 1e6, out_str, (double)out_bps / 1e6, total_duration_str, total_in_str, total_out_str, errors_str, resets_str);
+                snprintf(rst, sizeof(rst), " R%lu", (unsigned long)target->resets);
+            char frag[320];
+            int fl = snprintf(frag, sizeof(frag), " | %s %s/%s%s%s", target->name, in_str, out_str, extra, rst);
+            if (fl > 0) {
+                if ((size_t)fl >= sizeof(frag))
+                    fl = (int)sizeof(frag) - 1;
+                if (sum->len + (size_t)fl < sum->cap) {
+                    memcpy(sum->buf + sum->len, frag, (size_t)fl + 1);
+                    sum->len += (size_t)fl;
+                }
+            }
+            sum->window = duration;
         }
 
         json_object *iface = json_object_new_object();
@@ -372,6 +377,10 @@ static void traffic_poll_bundle(traffic_bundle_t *bundle) {
     int success_count = 0;
     int fail_count = 0;
 
+    char summary_buf[16384];
+    summary_buf[0] = '\0';
+    traffic_summary_t summary = { summary_buf, sizeof(summary_buf), 0, 0 };
+
     bool processed[MAX_TRAFFIC_TARGETS] = { false };
     for (int i = 0; i < bundle->target_count; i++) {
         if (processed[i])
@@ -387,13 +396,16 @@ static void traffic_poll_bundle(traffic_bundle_t *bundle) {
                     batch[batch_count++] = bundle->target_indices[j];
                     processed[j] = true;
                 }
-        traffic_collect_host(bundle->name, t0->host, t0->community, batch, batch_count, now, interfaces, &success_count, &fail_count);
+        traffic_collect_host(bundle->name, t0->host, t0->community, batch, batch_count, now, interfaces, &success_count, &fail_count, &summary);
     }
 
     if (json_object_array_length(interfaces) == 0) {
         json_object_put(interfaces);
         return;
     }
+
+    if (traffic_config.verbose && summary.len > 0)
+        printf("traffic[%s] %lds %d/%dok%s\n", bundle->name, (long)summary.window, success_count, bundle->target_count, summary.buf);
 
     bool all_ok = (fail_count == 0);
     char message[256];
