@@ -226,13 +226,14 @@ static uint64_t traffic_delta_u64(uint64_t curr, uint64_t prev, bool *reset) {
 }
 
 typedef struct {
-    char *buf;      // accumulates one compact " | iface rx/tx" fragment per interface for a single-line bundle summary
-    size_t cap;     // capacity of buf (including room for the trailing NUL)
-    size_t len;     // bytes used (excluding NUL)
-    time_t window;  // representative poll window (seconds) for the header
+    char *buf;     // accumulates one compact " | iface rx/tx" fragment per interface for a single-line bundle summary
+    size_t cap;    // capacity of buf (including room for the trailing NUL)
+    size_t len;    // bytes used (excluding NUL)
+    time_t window; // representative poll window (seconds) for the header
 } traffic_summary_t;
 
-static void traffic_collect_host(const char *bundle_name, const char *host, const char *community, const int *target_indices, int target_count, time_t now, json_object *interfaces, int *success_count, int *fail_count, traffic_summary_t *sum) {
+static void traffic_collect_host(const char *bundle_name, const char *host, const char *community, const int *target_indices, int target_count, time_t now, json_object *interfaces, int *success_count, int *fail_count,
+                                 traffic_summary_t *sum) {
 
     const int item_count = target_count * TRAFFIC_OID_COUNT;
     snmp_get_item_t *items = calloc((size_t)item_count, sizeof(snmp_get_item_t));

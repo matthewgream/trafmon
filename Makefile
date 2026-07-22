@@ -34,7 +34,7 @@ all: $(TARGET) $(DISCOVER)
 clean:
 	rm -f $(TARGET) $(DISCOVER) $(TARGET).armhf $(DISCOVER).armhf
 format:
-	clang-format -i $(TARGET).c $(DISCOVER).c include/*.h
+	clang-format-19 -i $(TARGET).c $(DISCOVER).c include/*.h
 test: $(TARGET)
 	./$(TARGET) --config $(CFG_SRC)
 DEV_PACKAGES=libmosquitto-dev libjson-c-dev libsnmp-dev
